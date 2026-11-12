@@ -1,0 +1,1078 @@
+openapi: 3.1.0
+info:
+  title: API de Prometeo
+  version: 0.4.0
+  description: Reportes ciudadanos de Yopal, Casanare.
+servers:
+- url: /api
+paths:
+  /health:
+    get:
+      summary: Salud de la API y PostgreSQL
+      responses:
+        '200':
+          description: Operación completada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum:
+                    - ok
+                  cache:
+                    type: string
+                    enum:
+                    - ready
+                    - degraded
+                    - disabled
+                required:
+                - status
+        '503':
+          description: PostgreSQL no está disponible
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum:
+                    - unavailable
+                required:
+                - status
+  /auth/session:
+    get:
+      summary: Consultar la sesión actual
+      responses:
+        '200':
+          description: Operación completada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+  /auth/register:
+    post:
+      summary: Registrar cuenta ciudadana e iniciar sesión
+      responses:
+        '201':
+          description: Operación completada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '400':
+          description: Datos inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Conflicto con los datos o el estado actual
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Se alcanzó el límite temporal de solicitudes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Register'
+  /auth/login:
+    post:
+      summary: Iniciar sesión con correo y contraseña
+      responses:
+        '200':
+          description: Operación completada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '400':
+          description: Datos inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Se requiere una sesión válida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Se alcanzó el límite temporal de solicitudes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Login'
+  /auth/logout:
+    post:
+      summary: Cerrar y revocar la sesión
+      responses:
+        '204':
+          description: Operación completada
+  /categories:
+    get:
+      summary: Listar categorías
+      responses:
+        '200':
+          description: Operación completada
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Category'
+  /stats:
+    get:
+      summary: Consultar indicadores de los incidentes registrados
+      responses:
+        '200':
+          description: Operación completada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Stats'
+  /incidents:
+    get:
+      summary: Listar hasta 500 reportes recientes
+      responses:
+        '200':
+          description: Operación completada
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Incident'
+        '400':
+          description: Datos inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Se requiere una sesión válida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: scope
+        in: query
+        description: mine requiere sesión y devuelve solo reportes de la cuenta.
+        schema:
+          type: string
+          enum:
+          - public
+          - mine
+          default: public
+    post:
+      summary: Registrar un incidente
+      responses:
+        '201':
+          description: Operación completada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncidentCreated'
+        '400':
+          description: Datos inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Se requiere una sesión válida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Se alcanzó el límite temporal de solicitudes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      description: La sesión es necesaria si el reporte es identificado. Por defecto, la ubicación es aproximada.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncidentWrite'
+  /incidents/{id}:
+    get:
+      summary: Consultar un incidente con su historial
+      responses:
+        '200':
+          description: Operación completada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncidentDetail'
+        '400':
+          description: Datos inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: No existe el recurso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    patch:
+      summary: Editar título y descripción de un reporte propio
+      responses:
+        '204':
+          description: Operación completada
+        '400':
+          description: Datos inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Se requiere una sesión válida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Permiso insuficiente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: No existe el recurso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncidentEdit'
+      security:
+      - SessionHttps: []
+      - SessionLocal: []
+    delete:
+      summary: Eliminar un reporte y su historial
+      responses:
+        '204':
+          description: Operación completada
+        '400':
+          description: Datos inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Se requiere una sesión válida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Permiso insuficiente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: No existe el recurso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      description: Requiere rol admin.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      security:
+      - SessionHttps: []
+      - SessionLocal: []
+  /incidents/{id}/updates:
+    post:
+      summary: Registrar seguimiento o avanzar al siguiente estado
+      responses:
+        '201':
+          description: Operación completada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Update'
+        '400':
+          description: Datos inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Se requiere una sesión válida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Permiso insuficiente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: No existe el recurso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Conflicto con los datos o el estado actual
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      description: Requiere moderator o admin. El orden es nuevo → en_verificacion → remitido → cerrado.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateWrite'
+      security:
+      - SessionHttps: []
+      - SessionLocal: []
+  /admin/roles:
+    patch:
+      summary: Asignar rol a una cuenta registrada
+      responses:
+        '204':
+          description: Operación completada
+        '400':
+          description: Datos inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Se requiere una sesión válida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Permiso insuficiente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: No existe el recurso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Conflicto con los datos o el estado actual
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      description: Requiere rol admin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleWrite'
+      security:
+      - SessionHttps: []
+      - SessionLocal: []
+  /admin/categories:
+    post:
+      summary: Crear categoría
+      responses:
+        '201':
+          description: Operación completada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        '400':
+          description: Datos inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Se requiere una sesión válida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Permiso insuficiente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Conflicto con los datos o el estado actual
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      description: Requiere rol admin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryWrite'
+      security:
+      - SessionHttps: []
+      - SessionLocal: []
+  /admin/categories/{id}:
+    put:
+      summary: Editar categoría
+      responses:
+        '204':
+          description: Operación completada
+        '400':
+          description: Datos inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Se requiere una sesión válida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Permiso insuficiente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: No existe el recurso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Conflicto con los datos o el estado actual
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      description: Requiere rol admin.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryWrite'
+      security:
+      - SessionHttps: []
+      - SessionLocal: []
+    delete:
+      summary: Eliminar categoría sin incidentes asociados
+      responses:
+        '204':
+          description: Operación completada
+        '400':
+          description: Datos inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Se requiere una sesión válida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Permiso insuficiente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: No existe el recurso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Conflicto con los datos o el estado actual
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      description: Requiere rol admin.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      security:
+      - SessionHttps: []
+      - SessionLocal: []
+  /version:
+    get:
+      summary: Versión y revisión desplegada
+      responses:
+        '200':
+          description: Identificador de la versión actual
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+      - error
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        full_name:
+          type: string
+        role:
+          type: string
+          enum:
+          - user
+          - moderator
+          - admin
+      required:
+      - id
+      - email
+      - full_name
+      - role
+    Session:
+      type: object
+      properties:
+        user:
+          anyOf:
+          - $ref: '#/components/schemas/User'
+          - type: 'null'
+      required:
+      - user
+    Register:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 12
+          maxLength: 128
+          writeOnly: true
+        full_name:
+          type: string
+          minLength: 2
+          maxLength: 100
+      required:
+      - email
+      - password
+      - full_name
+    Login:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 1
+          maxLength: 128
+          writeOnly: true
+      required:
+      - email
+      - password
+    CategoryWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 200
+        color:
+          type: string
+          pattern: ^#[0-9a-fA-F]{6}$
+      required:
+      - name
+      - description
+      - color
+    Category:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 200
+        color:
+          type: string
+          pattern: ^#[0-9a-fA-F]{6}$
+      required:
+      - id
+      - name
+      - description
+      - color
+    IncidentWrite:
+      type: object
+      properties:
+        category_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          minLength: 5
+          maxLength: 120
+        description:
+          type: string
+          minLength: 10
+          maxLength: 1000
+        severity:
+          type: integer
+          minimum: 1
+          maximum: 5
+        latitude:
+          type: number
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: number
+          minimum: -180
+          maximum: 180
+        subcategory:
+          anyOf:
+          - type: string
+            maxLength: 100
+          - type: 'null'
+        location_name:
+          anyOf:
+          - type: string
+            maxLength: 150
+          - type: 'null'
+        neighborhood:
+          anyOf:
+          - type: string
+            maxLength: 100
+          - type: 'null'
+        is_anonymous:
+          type: boolean
+        is_precise_location:
+          type: boolean
+        consent_updates:
+          type: boolean
+      required:
+      - category_id
+      - title
+      - description
+      - severity
+      - latitude
+      - longitude
+    IncidentEdit:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 5
+          maxLength: 120
+        description:
+          type: string
+          minLength: 10
+          maxLength: 1000
+      required:
+      - title
+      - description
+    Incident:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        category_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          minLength: 5
+          maxLength: 120
+        description:
+          type: string
+          minLength: 10
+          maxLength: 1000
+        severity:
+          type: integer
+          minimum: 1
+          maximum: 5
+        latitude:
+          type: number
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: number
+          minimum: -180
+          maximum: 180
+        subcategory:
+          anyOf:
+          - type: string
+            maxLength: 100
+          - type: 'null'
+        location_name:
+          anyOf:
+          - type: string
+            maxLength: 150
+          - type: 'null'
+        neighborhood:
+          anyOf:
+          - type: string
+            maxLength: 100
+          - type: 'null'
+        is_anonymous:
+          type: boolean
+        is_precise_location:
+          type: boolean
+        status:
+          type: string
+          enum:
+          - nuevo
+          - en_verificacion
+          - remitido
+          - cerrado
+        recalibrated_severity:
+          anyOf:
+          - type: integer
+            minimum: 1
+            maximum: 5
+          - type: 'null'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        resolved_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+      required:
+      - id
+      - category_id
+      - title
+      - description
+      - severity
+      - latitude
+      - longitude
+      - subcategory
+      - location_name
+      - neighborhood
+      - is_anonymous
+      - is_precise_location
+      - status
+      - recalibrated_severity
+      - created_at
+      - updated_at
+      - resolved_at
+    IncidentCreated:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - nuevo
+          - en_verificacion
+          - remitido
+          - cerrado
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - status
+      - created_at
+    UpdateWrite:
+      type: object
+      minProperties: 1
+      properties:
+        status:
+          type: string
+          enum:
+          - nuevo
+          - en_verificacion
+          - remitido
+          - cerrado
+        comment:
+          anyOf:
+          - type: string
+            maxLength: 500
+          - type: 'null'
+        recalibrated_severity:
+          type: integer
+          minimum: 1
+          maximum: 5
+    Update:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - nuevo
+          - en_verificacion
+          - remitido
+          - cerrado
+        comment:
+          anyOf:
+          - type: string
+          - type: 'null'
+        recalibrated_severity:
+          anyOf:
+          - type: integer
+            minimum: 1
+            maximum: 5
+          - type: 'null'
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - status
+      - comment
+      - recalibrated_severity
+      - created_at
+    IncidentDetail:
+      allOf:
+      - $ref: '#/components/schemas/Incident'
+      - type: object
+        properties:
+          updates:
+            type: array
+            items:
+              $ref: '#/components/schemas/Update'
+        required:
+        - updates
+    RoleWrite:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum:
+          - user
+          - moderator
+          - admin
+      required:
+      - email
+      - role
+    Stats:
+      type: object
+      properties:
+        total:
+          type: integer
+          minimum: 0
+        active:
+          type: integer
+          minimum: 0
+        closed:
+          type: integer
+          minimum: 0
+        closed_this_week:
+          type: integer
+          minimum: 0
+        this_month:
+          type: integer
+          minimum: 0
+        critical_areas:
+          type: integer
+          minimum: 0
+        average_close_hours:
+          anyOf:
+          - type: number
+          - type: 'null'
+        by_month:
+          type: array
+          items:
+            type: object
+            properties:
+              month:
+                type: string
+                pattern: ^[0-9]{4}-[0-9]{2}$
+              reported:
+                type: integer
+                minimum: 0
+              closed:
+                type: integer
+                minimum: 0
+            required:
+            - month
+            - reported
+            - closed
+        by_category:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              color:
+                type: string
+              count:
+                type: integer
+                minimum: 0
+            required:
+            - name
+            - color
+            - count
+        by_status:
+          type: array
+          items:
+            type: object
+            properties:
+              status:
+                type: string
+                enum:
+                - nuevo
+                - en_verificacion
+                - remitido
+                - cerrado
+              count:
+                type: integer
+                minimum: 0
+            required:
+            - status
+            - count
+        by_severity:
+          type: array
+          items:
+            type: object
+            properties:
+              severity:
+                type: integer
+                minimum: 1
+                maximum: 5
+              count:
+                type: integer
+                minimum: 0
+            required:
+            - severity
+            - count
+        by_neighborhood:
+          type: array
+          items:
+            type: object
+            properties:
+              neighborhood:
+                type: string
+              count:
+                type: integer
+                minimum: 0
+            required:
+            - neighborhood
+            - count
+      required:
+      - total
+      - active
+      - closed
+      - closed_this_week
+      - this_month
+      - critical_areas
+      - average_close_hours
+      - by_month
+      - by_category
+      - by_status
+      - by_severity
+      - by_neighborhood
+  securitySchemes:
+    SessionLocal:
+      type: apiKey
+      in: cookie
+      name: prometeo_session
+    SessionHttps:
+      type: apiKey
+      in: cookie
+      name: __Host-prometeo_session

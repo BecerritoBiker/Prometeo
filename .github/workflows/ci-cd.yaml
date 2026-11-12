@@ -1,0 +1,117 @@
+name: CI/CD Prometeo
+
+on:
+  create:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      simular_fallo:
+        description: "Hacer fallar la prueba de salud para la sustentación"
+        type: boolean
+        default: false
+      etiquetar_version:
+        description: "Publicar la etiqueta de entrega v0.4.0"
+        type: boolean
+        default: false
+
+concurrency:
+  group: prometeo-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validar:
+    name: Construir y probar Prometeo
+    if: github.event_name != 'create' || github.ref == 'refs/heads/demostracion-fallo'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TEST_BASE_URL: http://127.0.0.1:8080
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npm run lint && npm run typecheck
+      - run: npm audit --omit=dev --audit-level=high
+      - name: Revisar secretos en el historial Git
+        run: |
+          docker run --rm -v "$PWD:/repo:ro" -w /repo \
+            --entrypoint sh ghcr.io/gitleaks/gitleaks:v8.30.1 \
+            -c 'git config --global --add safe.directory /repo && gitleaks git --redact --log-opts="--all" .'
+      - name: Construir y levantar la aplicación
+        run: docker compose up -d --build --wait --wait-timeout 120
+      - name: Probar API, permisos y persistencia
+        run: npm run test:integration
+        env:
+          TEST_COMPOSE_RESTART: "1"
+          TEST_CACHE: "1"
+          TEST_EXPECT_STATUS: ${{ (github.event_name == 'create' || (github.event_name == 'workflow_dispatch' && inputs.simular_fallo)) && 'valor-incorrecto-de-demostracion' || '' }}
+      - name: Ver estado de los servicios
+        run: |
+          docker compose up -d --wait --wait-timeout 90
+          docker compose ps
+      - name: Diagnóstico de un fallo
+        if: failure()
+        run: docker compose logs --no-color --tail 60
+      - name: Eliminar los recursos temporales de CI
+        if: always()
+        run: docker compose down --volumes
+
+  publicar:
+    name: Publicar imagen en GHCR
+    needs: validar
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Construir y publicar por commit
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLICAR_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.etiquetar_version }}
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          source="https://github.com/$GITHUB_REPOSITORY"
+          revision="sha-$GITHUB_SHA"
+          printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker build \
+            --label "org.opencontainers.image.source=$source" \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --tag "$image:$revision" .
+          docker push "$image:$revision"
+          if [[ "$PUBLICAR_VERSION" == "true" ]]; then
+            version="v$(node -p 'require("./package.json").version')"
+            [[ "$version" == "v0.4.0" ]]
+            previous="$(git rev-parse -q --verify "refs/tags/$version^{commit}" || true)"
+            if [[ -n "$previous" && "$previous" != "$GITHUB_SHA" ]]; then
+              echo "La etiqueta ya identifica otro commit: $previous" >&2
+              exit 1
+            fi
+            docker tag "$image:$revision" "$image:$version"
+            docker push "$image:$version"
+            if [[ -z "$previous" ]]; then
+              git tag "$version"
+              git push origin "refs/tags/$version"
+            fi
+            echo "Imagen de entrega: $image:$version" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "Imagen del commit: $image:$revision" >> "$GITHUB_STEP_SUMMARY"
+      - name: Cerrar sesión del registro
+        if: always()
+        run: docker logout ghcr.io

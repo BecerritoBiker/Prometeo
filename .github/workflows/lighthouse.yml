@@ -1,0 +1,38 @@
+name: Lighthouse de la URL pública
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: URL HTTPS de la aplicación desplegada
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  auditar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+      - name: Medir línea base y versión optimizada
+        env:
+          URL_PUBLICA: ${{ inputs.url }}
+          CHROME_FLAGS: --headless --no-sandbox --disable-dev-shm-usage
+        run: |
+          case "$URL_PUBLICA" in https://*) ;; *) exit 1 ;; esac
+          export CHROME_PATH="$(command -v google-chrome || command -v chromium)"
+          bash scripts/medir-rendimiento.sh "$URL_PUBLICA" docs/lighthouse-publico
+      - name: Guardar los dos informes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-prometeo
+          path: docs/lighthouse-publico/
