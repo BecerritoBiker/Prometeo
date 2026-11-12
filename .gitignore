@@ -31,3 +31,5 @@ dist-ssr
 coverage/
 docs/lighthouse-publico/
 dist-baseline/
+
+docs/lighthouse-local/

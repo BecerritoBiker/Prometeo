@@ -1,12 +1,5 @@
-# Evidencias de verificación de Prometeo
+# Verificaciones funcionales de Prometeo
 
-El código y las pruebas reproducen las capacidades de la Entrega 4. La verificación pública se realiza sobre la URL de Render. Este archivo se actualiza con los resultados observados durante el cierre de la entrega.
+Se verificó la compilación de ambas portadas, la consulta de PostgreSQL y el uso de Redis para los indicadores. La suite completó registro, validación de datos, roles, transiciones concurrentes, historial, reinicio y revocación de sesión. En Chromium se completaron el formulario, la ubicación manual, el mapa, los filtros, la moderación en pantalla móvil y el cierre de sesión.
 
-| Capacidad | Evidencia preparada |
-| --- | --- |
-| Arranque y salud | `docker compose up --build -d --wait` y `docker compose ps` |
-| Acceso y HTTPS | URL pública de Render, certificado del navegador y `/api/health` |
-| Persistencia | Suite de integración y demostración con un reporte antes y después del reinicio |
-| Secretos | `.env.example`, credencial generada y escaneo de historial con Gitleaks |
-| CI/CD | `.github/workflows/ci-cd.yaml`, imagen por SHA y ejecución roja de demostración |
-| Rendimiento y accesibilidad | Dos variantes medibles en un mismo origen e informe Lighthouse |
+El escenario intencional comprueba que un fallo en la prueba de salud bloquea el trabajo de publicación. Las pruebas de Docker Compose se ejecutaron en GitHub Actions. Las mediciones públicas de Lighthouse y la validación del certificado se registran en [Evidencias de la Entrega 4](evidencias-publicas.md).

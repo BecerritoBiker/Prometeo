@@ -15,7 +15,7 @@ permissions:
 jobs:
   auditar:
     if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/lighthouse-publico')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 12
     env:
       URL_PUBLICA: ${{ inputs.url || 'https://prometeo-yopal-dbua.onrender.com' }}
