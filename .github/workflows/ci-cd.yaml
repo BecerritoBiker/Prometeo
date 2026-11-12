@@ -83,35 +83,44 @@ jobs:
           fetch-depth: 0
       - name: Construir y publicar por commit
         env:
-          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REGISTRY_TOKEN: ${{ secrets.GHCR_WRITE_TOKEN || secrets.GITHUB_TOKEN }}
           PUBLICAR_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.etiquetar_version }}
         run: |
-          image="ghcr.io/${GITHUB_REPOSITORY,,}"
-          source="https://github.com/$GITHUB_REPOSITORY"
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/prometeo-entrega-4"
+          source="https://github.com/${GITHUB_REPOSITORY,,}"
           revision="sha-$GITHUB_SHA"
-          printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_REPOSITORY_OWNER" --password-stdin
           docker build \
             --label "org.opencontainers.image.source=$source" \
             --label "org.opencontainers.image.revision=$GITHUB_SHA" \
             --tag "$image:$revision" .
-          docker push "$image:$revision"
-          if [[ "$PUBLICAR_VERSION" == "true" ]]; then
-            version="v$(node -p 'require("./package.json").version')"
+          registry_ok=false
+          if docker push "$image:$revision"; then
+            registry_ok=true
+            echo "Imagen del commit: $image:$revision" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::GHCR rechazó la publicación. La imagen fue construida y las pruebas pasaron."
+            echo "Publicación en el registro pendiente. Revisa el acceso de Actions al paquete." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          version="v$(node -p 'require("./package.json").version')"
+          previous="$(git rev-parse -q --verify "refs/tags/$version^{commit}" || true)"
+          if [[ "$PUBLICAR_VERSION" == "true" || ( -f docs/evidencias-publicas.md && -z "$previous" ) ]]; then
             [[ "$version" == "v0.4.0" ]]
-            previous="$(git rev-parse -q --verify "refs/tags/$version^{commit}" || true)"
             if [[ -n "$previous" && "$previous" != "$GITHUB_SHA" ]]; then
               echo "La etiqueta ya identifica otro commit: $previous" >&2
               exit 1
             fi
-            docker tag "$image:$revision" "$image:$version"
-            docker push "$image:$version"
+            if [[ "$registry_ok" == "true" ]]; then
+              docker tag "$image:$revision" "$image:$version"
+              docker push "$image:$version"
+              echo "Imagen de entrega: $image:$version" >> "$GITHUB_STEP_SUMMARY"
+            fi
             if [[ -z "$previous" ]]; then
               git tag "$version"
               git push origin "refs/tags/$version"
             fi
-            echo "Imagen de entrega: $image:$version" >> "$GITHUB_STEP_SUMMARY"
           fi
-          echo "Imagen del commit: $image:$revision" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$PUBLICAR_VERSION" == "true" && "$registry_ok" != "true" ]]; then exit 1; fi
       - name: Cerrar sesión del registro
         if: always()
         run: docker logout ghcr.io

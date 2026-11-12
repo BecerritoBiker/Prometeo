@@ -1,6 +1,7 @@
 name: Lighthouse de la URL pública
 
 on:
+  create:
   workflow_dispatch:
     inputs:
       url:
@@ -13,8 +14,11 @@ permissions:
 
 jobs:
   auditar:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/lighthouse-publico')
     runs-on: ubuntu-latest
     timeout-minutes: 12
+    env:
+      URL_PUBLICA: ${{ inputs.url || 'https://prometeo-yopal-dbua.onrender.com' }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -22,14 +26,33 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
+      - name: Verificar el certificado HTTPS público
+        run: |
+          mkdir -p docs/lighthouse-publico
+          host="$(node -e 'const u=new URL(process.env.URL_PUBLICA); if(u.protocol!=="https:")process.exit(1); console.log(u.hostname)')"
+          timeout 20 openssl s_client -connect "$host:443" -servername "$host" \
+            -verify_hostname "$host" -verify_return_error < /dev/null > "$RUNNER_TEMP/https.txt"
+          openssl x509 -in "$RUNNER_TEMP/https.txt" -noout -subject -issuer -dates > docs/lighthouse-publico/certificado.txt
+          grep 'Verify return code' "$RUNNER_TEMP/https.txt" >> docs/lighthouse-publico/certificado.txt
+          cat docs/lighthouse-publico/certificado.txt
+      - name: Instalar Chromium para Lighthouse
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/chromium
+        run: |
+          npx --yes playwright@1.58.2 install --only-shell chromium
+          binary="$(find "$PLAYWRIGHT_BROWSERS_PATH" -type f -name chrome-headless-shell -print -quit)"
+          test -x "$binary"
+          echo "CHROME_PATH=$binary" >> "$GITHUB_ENV"
       - name: Medir línea base y versión optimizada
         env:
-          URL_PUBLICA: ${{ inputs.url }}
           CHROME_FLAGS: --headless --no-sandbox --disable-dev-shm-usage
         run: |
           case "$URL_PUBLICA" in https://*) ;; *) exit 1 ;; esac
-          export CHROME_PATH="$(command -v google-chrome || command -v chromium)"
-          bash scripts/medir-rendimiento.sh "$URL_PUBLICA" docs/lighthouse-publico
+          for attempt in 1 2 3; do
+            if bash scripts/medir-rendimiento.sh "$URL_PUBLICA" docs/lighthouse-publico; then exit 0; fi
+            sleep 3
+          done
+          exit 1
       - name: Guardar los dos informes
         if: always()
         uses: actions/upload-artifact@v4

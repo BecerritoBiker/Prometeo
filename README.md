@@ -61,7 +61,7 @@ Compose establece los valores para el arranque local y genera la credencial de P
 
 Cada push a `main` ejecuta **CI/CD Prometeo**. El flujo construye Compose, verifica integración, persistencia y permisos, y publica la imagen en GHCR con etiqueta `sha-<commit>`. Render reconstruye el mismo commit desde el Dockerfile cuando los checks pasan. Una prueba fallida bloquea la publicación de imagen y la actualización del servicio. En un pull request se prueban los cambios antes de integrarlos.
 
-Para la entrega ejecuta **Actions → CI/CD Prometeo → Run workflow** en `main`, con `etiquetar_version` activado y `simular_fallo` desactivado. Tras pasar las pruebas se publican el tag Git `v0.4.0` y la imagen `ghcr.io/becerritobiker/prometeo:v0.4.0`. Verifica la visibilidad del paquete en GitHub Packages para el evaluador.
+Para la entrega ejecuta **Actions → CI/CD Prometeo → Run workflow** en `main`, con `etiquetar_version` activado y `simular_fallo` desactivado. Tras pasar las pruebas se publican el tag Git `v0.4.0` y la imagen `ghcr.io/becerritobiker/prometeo-entrega-4:v0.4.0`. Verifica la visibilidad del paquete en GitHub Packages para el evaluador. Si el registro rechaza el token automático, un propietario puede conceder acceso al repositorio en el paquete o configurar el secreto de Actions `GHCR_WRITE_TOKEN` con permiso de publicación.
 
 Si necesitas revertir la versión pública, elige el despliegue anterior desde **Render → Events**. Para mantener la reversión en futuras integraciones, usa un commit que revierta el cambio en `main`. Un rollback de la aplicación no revierte automáticamente los datos ni las migraciones.
 
