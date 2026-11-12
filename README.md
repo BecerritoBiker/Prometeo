@@ -1,6 +1,6 @@
 # Prometeo
 
-**Despliegue público** · Pendiente de primera publicación en Render. El enlace definitivo se registra aquí una vez validado.
+**Despliegue público** · [https://prometeo-yopal-dbua.onrender.com](https://prometeo-yopal-dbua.onrender.com)
 **Repositorio** · [BecerritoBiker/Prometeo](https://github.com/BecerritoBiker/Prometeo)
 
 Aplicación de reportes ciudadanos de Yopal, Casanare. Base de SERAFY adaptada para la Entrega 4 de Tecnologías Web de Unitrópico. El mapa y los indicadores son públicos. Una cuenta ciudadana puede consultar sus reportes, y un moderador puede actualizar sus estados.

@@ -74,7 +74,7 @@ async function checkRestart() {
 test('Prometeo: API, roles y persistencia', async (t) => {
   await t.test('La API responde y puede leer PostgreSQL', async () => {
     const health = await status('/health', 200);
-    assert.equal(health.status, process.env.TEST_EXPECT_STATUS ?? 'ok');
+    assert.equal(health.status, process.env.TEST_EXPECT_STATUS || 'ok');
     await status('/openapi.json', 200);
     await status('/version', 200);
   });
