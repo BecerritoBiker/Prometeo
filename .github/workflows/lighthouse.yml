@@ -1,6 +1,7 @@
 name: Lighthouse de la URL pública
 
 on:
+  create:
   workflow_dispatch:
     inputs:
       url:
@@ -13,8 +14,11 @@ permissions:
 
 jobs:
   auditar:
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/lighthouse-publico'
     runs-on: ubuntu-latest
     timeout-minutes: 12
+    env:
+      URL_PUBLICA: ${{ inputs.url || 'https://prometeo-yopal-dbua.onrender.com' }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -22,9 +26,17 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
+      - name: Verificar el certificado HTTPS público
+        run: |
+          mkdir -p docs/lighthouse-publico
+          host="$(node -e 'const u=new URL(process.env.URL_PUBLICA); if(u.protocol!=="https:")process.exit(1); console.log(u.hostname)')"
+          timeout 20 openssl s_client -connect "$host:443" -servername "$host" \
+            -verify_hostname "$host" -verify_return_error < /dev/null > "$RUNNER_TEMP/https.txt"
+          openssl x509 -in "$RUNNER_TEMP/https.txt" -noout -subject -issuer -dates > docs/lighthouse-publico/certificado.txt
+          grep 'Verify return code' "$RUNNER_TEMP/https.txt" >> docs/lighthouse-publico/certificado.txt
+          cat docs/lighthouse-publico/certificado.txt
       - name: Medir línea base y versión optimizada
         env:
-          URL_PUBLICA: ${{ inputs.url }}
           CHROME_FLAGS: --headless --no-sandbox --disable-dev-shm-usage
         run: |
           case "$URL_PUBLICA" in https://*) ;; *) exit 1 ;; esac
